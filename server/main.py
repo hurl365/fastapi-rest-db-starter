@@ -33,6 +33,22 @@ def db_create_user(first_name:str, last_name:str) -> int:
   3. Close the connection to the database
   4. Return the new user's ID (this is stored in the cursor's 'lastrowid' attribute after execution)
   '''
+  # Connect to the db and create a cursor object
+  db =mysql.connect(user=db_user, password=db_pass, host=db_host)
+  cursor = db.cursor()
+  # Find database
+  cursor.execute("USE ece140")
+  try:
+    # Try inserting the values
+    query = "INSERT INTO users (first_name, last_name) values (%s, %s)"
+    value = (first_name, last_name)
+    cursor.execute(query, value)
+    # Commit the changes
+    db.commit()
+  except RuntimeError as err:
+    print("runtime error: {0}".format(err))
+  # disconnecting from server
+  db.close()
   return 0
 
 # SELECT SQL query
@@ -44,7 +60,29 @@ def db_select_users(user_id:int=None) -> list:
   4. Close the connection to the database
   5. Return the retrieved record(s)
   '''
-  return []
+  # Connect to the db and create a cursor object
+  db =mysql.connect(user=db_user, password=db_pass, host=db_host)
+  cursor = db.cursor()
+  # Find database
+  cursor.execute("USE ece140")
+  records = []
+  try:
+    # Try inserting the values
+    if (user_id ==  None):
+      cursor.execute("SELECT id, first_name, last_name from users")
+    else:
+      query = "SELECT id, first_name, last_name from users where id=%s"
+      value = (user_id)
+      cursor.execute(query, value)
+    # Commit the changes
+    db.commit()
+    # fetch the remaining rows
+    records = cursor.fetchall()
+  except RuntimeError as err:
+    print("runtime error: {0}".format(err))
+  # disconnecting from server
+  db.close()
+  return records
 
 # UPDATE SQL query
 def db_update_user(user_id:int, first_name:str, last_name:str) -> bool:

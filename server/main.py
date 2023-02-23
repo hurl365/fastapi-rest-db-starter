@@ -48,6 +48,7 @@ def db_create_user(first_name:str, last_name:str) -> int:
   except RuntimeError as err:
     print("runtime error: {0}".format(err))
   # disconnecting from server
+  cursor.reset()
   db.close()
   return 0
 
@@ -65,6 +66,7 @@ def db_select_users(user_id:int=None) -> list:
   cursor = db.cursor()
   # Find database
   cursor.execute("USE ece140")
+  cursor.reset()
   records = []
   try:
     # Try inserting the values
@@ -74,8 +76,9 @@ def db_select_users(user_id:int=None) -> list:
       query = "SELECT id, first_name, last_name from users where id=%s"
       value = (user_id)
       cursor.execute(query, value)
-    # Commit the changes
-    db.commit()
+      # Lab 7: fixed the internal server error on unread result
+      # Commit the changes
+      db.commit()
     # fetch the remaining rows
     records = cursor.fetchall()
   except RuntimeError as err:
@@ -93,7 +96,29 @@ def db_update_user(user_id:int, first_name:str, last_name:str) -> bool:
   4. Return True if a row in the database was successfully updated and False otherwise (you can
      check how many records were affected by looking at the cursor's 'rowcount' attribute)
   '''
-  return False
+  # Connect to the db and create a cursor object
+  db =mysql.connect(user=db_user, password=db_pass, host=db_host)
+  cursor = db.cursor()
+  # Find database
+  cursor.execute("USE ece140")
+  try:
+    # Try inserting the values
+    if (user_id ==  None) or (first_name == "") or (last_name == ""):
+      return False
+    else:
+      query = "UPDATE users SET first_name=%s, last_name=%s WHERE id=%s"
+      value = (first_name, last_name, user_id)
+      cursor.execute(query, value)
+      rowcount = cursor.rowcount
+      # Commit the changes
+      db.commit()
+  except RuntimeError as err:
+    print("runtime error: {0}".format(err))
+    return False
+  # disconnecting from server
+  cursor.reset()
+  db.close()
+  return rowcount > 0
 
 # DELETE SQL query
 def db_delete_user(user_id:int) -> bool:
@@ -104,7 +129,29 @@ def db_delete_user(user_id:int) -> bool:
   4. Return True if a row in the database was successfully deleted and False otherwise (you can
      check how many records were affected by looking at the cursor's 'rowcount' attribute)
   '''
-  return False
+  # Connect to the db and create a cursor object
+  db =mysql.connect(user=db_user, password=db_pass, host=db_host)
+  cursor = db.cursor()
+  # Find database
+  cursor.execute("USE ece140")
+  try:
+    # Try inserting the values
+    if (user_id ==  None):
+      return False
+    else:
+      query = "DELETE from users WHERE id=%s"
+      value = (user_id)
+      cursor.execute(query, value)
+      rowcount = cursor.rowcount
+    # Commit the changes
+    db.commit()
+  except RuntimeError as err:
+    print("runtime error: {0}".format(err))
+    return False
+  # disconnecting from server
+  cursor.reset()
+  db.close()
+  return rowcount > 0
 
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 # Home route to load the main page in a templatized fashion
@@ -115,6 +162,8 @@ def get_home(request:Request) -> HTMLResponse:
   return views.TemplateResponse('index.html', {'request':request, 'users':db_select_users()})
 
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+# Lab 7: Filled in the methods below:
+
 # RESTful User Routes
 
 # GET /users
@@ -127,7 +176,8 @@ def get_users() -> dict:
     'id', 'first_name', and 'last_name'
   3. Return this collection as a JSON object, where the key is 'users' and the value is the list
   '''
-  return {'users': []}
+  # 
+  return {'users': db_select_users()}
 
 # GET /users/{user_id}
 # Used to query a single user
@@ -139,7 +189,7 @@ def get_user(user_id:int) -> dict:
   3. Otherwise, format the result as JSON where the keys are: 'id', 'first_name', and 'last_name'
   4. Return this object
   '''
-  return {}
+  return db_select_users(user_id)
 
 # POST /users
 # Used to create a new user
@@ -151,7 +201,9 @@ async def post_user(request:Request) -> dict:
   3. Create a new user in the database
   4. Return the user record back to the client as JSON
   '''
-  return {}
+  dataReceived = await request.json()
+  return {"fisrt_name" : db_create_user(dataReceived.fisrt_name), 
+          "last_name" : db_create_user(dataReceived.last_name)}
 
 # PUT /users/{user_id}
 @app.put('/users/{user_id}')
@@ -161,7 +213,8 @@ async def put_user(user_id:int, request:Request) -> dict:
   2. Attempt to update the user first and last name in the database
   3. Return the update status under the 'success' key
   '''
-  return {'success': False}
+  dataReceived = await request.json()
+  return {'success': db_update_user(user_id, dataReceived["first_name"], dataReceived["last_name"])}
 
 # DELETE /users/{user_id}
 @app.delete('/users/{user_id}')
@@ -170,7 +223,7 @@ def delete_user(user_id:int) -> dict:
   1. Attempt to delete the user from the database
   2. Return the delete status under the 'success' key
   '''
-  return {'success': False}
+  return {'success': db_delete_user(user_id)}
 
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 # If running the server directly from Python as a module
